@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Quiz Duel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #game-setup, #game-area, #waiting-room {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #game-area { display: none; }
+        #waiting-room { display: none; }
+        .player {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        #answers {
+            margin: 20px 0;
+        }
+        #answer-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+        }
+        .score {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .correct { color: green; }
+        .incorrect { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Quiz Duel</h1>
+    
+    <div id="game-setup">
+        <h2>Create or Join Game</h2>
+        <input type="text" id="player-name" placeholder="Your Name">
+        <input type="text" id="game-id" placeholder="Game ID (leave empty to create)">
+        <button id="join-game">Join Game</button>
+    </div>
+    
+    <div id="waiting-room">
+        <h2>Waiting for opponent...</h2>
+        <p>Game ID: <span id="display-game-id"></span></p>
+        <p>Share this ID with your opponent</p>
+        <div id="players-list"></div>
+    </div>
+    
+    <div id="game-area">
+        <div class="scoreboard">
+            <div>Player 1: <span id="player1-name"></span> <span id="player1-score" class="score">0</span></div>
+            <div>Player 2: <span id="player2-name"></span> <span id="player2-score" class="score">0</span></div>
+        </div>
+        
+        <div id="question-display">
+            <h2 id="question-text"></h2>
+            <div id="timer">Time left: <span id="time-left">30</span>s</div>
+            <input type="text" id="answer-input" placeholder="Your answer...">
+            <button id="submit-answer">Submit</button>
+        </div>
+        
+        <div id="answers" style="display:none;">
+            <h3>Answers:</h3>
+            <p>Your answer: <span id="your-answer"></span> - <span id="your-result"></span></p>
+            <p>Opponent's answer: <span id="opponent-answer"></span> - <span id="opponent-result"></span></p>
+            <p>Correct answer: <span id="correct-answer"></span></p>
+            <button id="next-question">Next Question</button>
+        </div>
+    </div>
+
+    <!-- Add Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <script>
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // Game variables
+        let playerId;
+        let gameId;
+        let playerName;
+        let playerNumber;
+        let currentQuestionIndex = 0;
+        let timer;
+        let timeLeft = 30;
+        
+        // Quiz questions
+        const questions = [
+            {
+                question: "What is the capital of France?",
+                answer: "Paris"
+            },
+            {
+                question: "Which planet is known as the Red Planet?",
+                answer: "Mars"
+            },
+            {
+                question: "What is the largest mammal?",
+                answer: "Blue whale"
+            },
+            // Add more questions...
+        ];
+        
+        // DOM elements
+        const gameSetup = document.getElementById('game-setup');
+        const waitingRoom = document.getElementById('waiting-room');
+        const gameArea = document.getElementById('game-area');
+        const joinBtn = document.getElementById('join-game');
+        const playerNameInput = document.getElementById('player-name');
+        const gameIdInput = document.getElementById('game-id');
+        const displayGameId = document.getElementById('display-game-id');
+        const playersList = document.getElementById('players-list');
+        const questionText = document.getElementById('question-text');
+        const answerInput = document.getElementById('answer-input');
+        const submitBtn = document.getElementById('submit-answer');
+        const answersDiv = document.getElementById('answers');
+        const yourAnswer = document.getElementById('your-answer');
+        const yourResult = document.getElementById('your-result');
+        const opponentAnswer = document.getElementById('opponent-answer');
+        const opponentResult = document.getElementById('opponent-result');
+        const correctAnswer = document.getElementById('correct-answer');
+        const nextQuestionBtn = document.getElementById('next-question');
+        const timeLeftDisplay = document.getElementById('time-left');
+        
+        // Join game button click
+        joinBtn.addEventListener('click', () => {
+            playerName = playerNameInput.value.trim();
+            gameId = gameIdInput.value.trim();
+            
+            if (!playerName) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            playerId = generateId();
+            
+            if (!gameId) {
+                // Create new game
+                gameId = generateId();
+                playerNumber = 1;
+                createGame();
+            } else {
+                // Join existing game
+                joinGame();
+            }
+        });
+        
+        // Generate random ID
+        function generateId() {
+            return Math.random().toString(36).substring(2, 10);
+        }
+        
+        // Create new game
+        function createGame() {
+            gameSetup.style.display = 'none';
+            waitingRoom.style.display = 'block';
+            displayGameId.textContent = gameId;
+            
+            const gameRef = database.ref('games/' + gameId);
+            
+            gameRef.set({
+                player1: {
+                    id: playerId,
+                    name: playerName,
+                    score: 0,
+                    answer: '',
+                    ready: true
+                },
+                player2: {
+                    id: '',
+                    name: '',
+                    score: 0,
+                    answer: '',
+                    ready: false
+                },
+                currentQuestion: 0,
+                gameState: 'waiting' // waiting, playing, showingResults
+            });
+            
+            // Listen for changes
+            gameRef.on('value', (snapshot) => {
+                const game = snapshot.val();
+                updateWaitingRoom(game);
+                
+                if (game.player2.id && game.gameState === 'playing') {
+                    startGame(game);
+                }
+            });
+        }
+        
+        // Join existing game
+        function joinGame() {
+            const gameRef = database.ref('games/' + gameId);
+            
+            gameRef.once('value').then((snapshot) => {
+                const game = snapshot.val();
+                
+                if (!game) {
+                    alert('Game not found');
+                    return;
+                }
+                
+                if (game.player2.id) {
+                    alert('Game is full');
+                    return;
+                }
+                
+                playerNumber = 2;
+                
+                gameRef.update({
+                    player2: {
+                        id: playerId,
+                        name: playerName,
+                        score: 0,
+                        answer: '',
+                        ready: true
+                    },
+                    gameState: 'playing'
+                });
+                
+                gameSetup.style.display = 'none';
+                startGame(game);
+            });
+        }
+        
+        // Update waiting room
+        function updateWaitingRoom(game) {
+            playersList.innerHTML = '';
+            
+            const player1Div = document.createElement('div');
+            player1Div.className = 'player';
+            player1Div.textContent = game.player1.name + (game.player1.id === playerId ? ' (You)' : '');
+            playersList.appendChild(player1Div);
+            
+            if (game.player2.id) {
+                const player2Div = document.createElement('div');
+                player2Div.className = 'player';
+                player2Div.textContent = game.player2.name + (game.player2.id === playerId ? ' (You)' : '');
+                playersList.appendChild(player2Div);
+            }
+        }
+        
+        // Start the game
+        function startGame(game) {
+            waitingRoom.style.display = 'none';
+            gameArea.style.display = 'block';
+            
+            // Update player names
+            document.getElementById('player1-name').textContent = game.player1.name;
+            document.getElementById('player2-name').textContent = game.player2.name || 'Waiting...';
+            
+            // Listen for game changes
+            const gameRef = database.ref('games/' + gameId);
+            gameRef.on('value', (snapshot) => {
+                const updatedGame = snapshot.val();
+                handleGameUpdate(updatedGame);
+            });
+            
+            // Start first question
+            loadQuestion(0);
+        }
+        
+        // Handle game updates
+        function handleGameUpdate(game) {
+            // Update scores
+            document.getElementById('player1-score').textContent = game.player1.score;
+            document.getElementById('player2-score').textContent = game.player2.score;
+            
+            // Handle question changes
+            if (game.currentQuestion !== currentQuestionIndex) {
+                currentQuestionIndex = game.currentQuestion;
+                loadQuestion(currentQuestionIndex);
+            }
+            
+            // Show answers when both players have answered
+            if (game.gameState === 'showingResults') {
+                showAnswers(game);
+            }
+        }
+        
+        // Load question
+        function loadQuestion(index) {
+            if (index >= questions.length) {
+                endGame();
+                return;
+            }
+            
+            const question = questions[index];
+            questionText.textContent = question.question;
+            answerInput.value = '';
+            answersDiv.style.display = 'none';
+            document.getElementById('question-display').style.display = 'block';
+            
+            // Start timer
+            timeLeft = 30;
+            timeLeftDisplay.textContent = timeLeft;
+            
+            if (timer) clearInterval(timer);
+            timer = setInterval(() => {
+                timeLeft--;
+                timeLeftDisplay.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    submitAnswer();
+                }
+            }, 1000);
+        }
+        
+        // Submit answer
+        submitBtn.addEventListener('click', submitAnswer);
+        
+        function submitAnswer() {
+            clearInterval(timer);
+            
+            const answer = answerInput.value.trim();
+            const playerKey = `player${playerNumber}`;
+            const updates = {};
+            updates[`${playerKey}/answer`] = answer;
+            
+            database.ref('games/' + gameId).update(updates);
+            
+            // Check if both players have answered
+            database.ref('games/' + gameId).once('value').then((snapshot) => {
+                const game = snapshot.val();
+                
+                if ((game.player1.answer && game.player2.answer) || 
+                    (timeLeft <= 0 && (game.player1.answer || game.player2.answer))) {
+                    evaluateAnswers(game);
+                }
+            });
+            
+            document.getElementById('question-display').style.display = 'none';
+        }
+        
+        // Evaluate answers
+        function evaluateAnswers(game) {
+            const correctAns = questions[currentQuestionIndex].answer.toLowerCase();
+            const updates = {};
+            
+            // Check player1's answer
+            const player1Ans = game.player1.answer.toLowerCase();
+            const player1Correct = player1Ans === correctAns;
+            updates['player1/score'] = game.player1.score + (player1Correct ? 1 : 0);
+            
+            // Check player2's answer
+            const player2Ans = game.player2.answer.toLowerCase();
+            const player2Correct = player2Ans === correctAns;
+            updates['player2/score'] = game.player2.score + (player2Correct ? 1 : 0);
+            
+            updates['gameState'] = 'showingResults';
+            
+            database.ref('games/' + gameId).update(updates);
+        }
+        
+        // Show answers
+        function showAnswers(game) {
+            answersDiv.style.display = 'block';
+            
+            const correctAns = questions[currentQuestionIndex].answer;
+            correctAnswer.textContent = correctAns;
+            
+            // Your answer
+            const yourAns = game[`player${playerNumber}`].answer;
+            const yourCorrect = yourAns.toLowerCase() === correctAns.toLowerCase();
+            yourAnswer.textContent = yourAns || "(No answer)";
+            yourResult.textContent = yourCorrect ? "Correct!" : "Incorrect";
+            yourResult.className = yourCorrect ? "correct" : "incorrect";
+            
+            // Opponent's answer
+            const opponentNum = playerNumber === 1 ? 2 : 1;
+            const opponentAns = game[`player${opponentNum}`].answer;
+            const opponentCorrect = opponentAns.toLowerCase() === correctAns.toLowerCase();
+            opponentAnswer.textContent = opponentAns || "(No answer)";
+            opponentResult.textContent = opponentCorrect ? "Correct!" : "Incorrect";
+            opponentResult.className = opponentCorrect ? "correct" : "incorrect";
+        }
+        
+        // Next question
+        nextQuestionBtn.addEventListener('click', () => {
+            currentQuestionIndex++;
+            
+            database.ref('games/' + gameId).update({
+                currentQuestion: currentQuestionIndex,
+                gameState: 'playing',
+                'player1/answer': '',
+                'player2/answer': ''
+            });
+        });
+        
+        // End game
+        function endGame() {
+            gameArea.innerHTML = `
+                <h2>Game Over!</h2>
+                <p>Final Scores:</p>
+                <p>${document.getElementById('player1-name').textContent}: ${document.getElementById('player1-score').textContent}</p>
+                <p>${document.getElementById('player2-name').textContent}: ${document.getElementById('player2-score').textContent}</p>
+                <button onclick="location.reload()">Play Again</button>
+            `;
+            
+            // Clean up Firebase reference
+            database.ref('games/' + gameId).off();
+        }
+    </script>
+</body>
+</html>
