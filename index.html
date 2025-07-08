@@ -10,51 +10,98 @@
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            background-color: #f5f5f5;
         }
         #game-setup, #game-area, #waiting-room {
             margin-bottom: 20px;
             padding: 20px;
             border: 1px solid #ddd;
-            border-radius: 5px;
+            border-radius: 10px;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         #game-area { display: none; }
         #waiting-room { display: none; }
         .player {
-            padding: 10px;
-            margin: 5px 0;
-            background-color: #f0f0f0;
-            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #f0f8ff;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
         }
         #answers {
             margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
         }
         #answer-input {
             width: 100%;
-            padding: 10px;
-            margin: 10px 0;
+            padding: 12px;
+            margin: 15px 0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
         }
         button {
-            padding: 10px 15px;
+            padding: 12px 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
         }
         button:disabled {
             background-color: #cccccc;
+            cursor: not-allowed;
         }
         .scoreboard {
             display: flex;
             justify-content: space-between;
-            margin: 20px 0;
+            margin: 25px 0;
+            padding: 15px;
+            background-color: #e9f7ef;
+            border-radius: 8px;
         }
         .score {
             font-weight: bold;
-            font-size: 1.2em;
+            font-size: 1.3em;
+            color: #2e7d32;
         }
-        .correct { color: green; }
-        .incorrect { color: red; }
+        .correct { 
+            color: #2e7d32;
+            font-weight: bold;
+        }
+        .incorrect { 
+            color: #c62828;
+            font-weight: bold;
+        }
+        #timer {
+            font-size: 1.2em;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #fff3e0;
+            border-radius: 6px;
+            text-align: center;
+        }
+        h1 {
+            color: #2e7d32;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        input {
+            padding: 10px;
+            margin: 10px 0;
+            width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -62,14 +109,14 @@
     
     <div id="game-setup">
         <h2>Create or Join Game</h2>
-        <input type="text" id="player-name" placeholder="Your Name">
+        <input type="text" id="player-name" placeholder="Your Name" required>
         <input type="text" id="game-id" placeholder="Game ID (leave empty to create)">
         <button id="join-game">Join Game</button>
     </div>
     
     <div id="waiting-room">
         <h2>Waiting for opponent...</h2>
-        <p>Game ID: <span id="display-game-id"></span></p>
+        <p>Game ID: <strong><span id="display-game-id"></span></strong></p>
         <p>Share this ID with your opponent</p>
         <div id="players-list"></div>
     </div>
@@ -82,38 +129,39 @@
         
         <div id="question-display">
             <h2 id="question-text"></h2>
-            <div id="timer">Time left: <span id="time-left">30</span>s</div>
-            <input type="text" id="answer-input" placeholder="Your answer...">
-            <button id="submit-answer">Submit</button>
+            <div id="timer">⏱️ Time left: <span id="time-left">30</span>s</div>
+            <input type="text" id="answer-input" placeholder="Type your answer..." autocomplete="off">
+            <button id="submit-answer">Submit Answer</button>
         </div>
         
         <div id="answers" style="display:none;">
-            <h3>Answers:</h3>
+            <h3>Results:</h3>
             <p>Your answer: <span id="your-answer"></span> - <span id="your-result"></span></p>
             <p>Opponent's answer: <span id="opponent-answer"></span> - <span id="opponent-result"></span></p>
-            <p>Correct answer: <span id="correct-answer"></span></p>
+            <p>Correct answer: <strong><span id="correct-answer"></span></strong></p>
             <button id="next-question">Next Question</button>
         </div>
     </div>
 
-    <!-- Add Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     
     <script>
-        // Your Firebase configuration
+        // Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_UNIQUE_API_KEY",
-            authDomain: "your-project-id.firebaseapp.com",
-            databaseURL: "https://your-project-id.firebaseio.com",
-            projectId: "your-project-id",
-            storageBucket: "your-project-id.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdef1234567890"
+            apiKey: "AIzaSyCqDgRpibCM0nldrmbD4EvF-YjBi1d71Ok",
+            authDomain: "quiz-game-8b39f.firebaseapp.com",
+            databaseURL: "https://quiz-game-8b39f-default-rtdb.firebaseio.com",
+            projectId: "quiz-game-8b39f",
+            storageBucket: "quiz-game-8b39f.firebasestorage.app",
+            messagingSenderId: "187201637307",
+            appId: "1:187201637307:web:0563141da3030e8398529e",
+            measurementId: "G-5C18PB35YG"
         };
         
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
+        const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         
         // Game variables
@@ -125,21 +173,33 @@
         let timer;
         let timeLeft = 30;
         
-        // Quiz questions
+        // Enhanced quiz questions
         const questions = [
             {
                 question: "What is the capital of France?",
-                answer: "Paris"
+                answer: "paris",
+                acceptableAnswers: ["paris", "city of paris"]
             },
             {
                 question: "Which planet is known as the Red Planet?",
-                answer: "Mars"
+                answer: "mars",
+                acceptableAnswers: ["mars", "planet mars"]
             },
             {
-                question: "What is the largest mammal?",
-                answer: "Blue whale"
+                question: "What is the largest mammal on Earth?",
+                answer: "blue whale",
+                acceptableAnswers: ["blue whale", "whale", "blue whales"]
             },
-            // Add more questions...
+            {
+                question: "In which year did World War II end?",
+                answer: "1945",
+                acceptableAnswers: ["1945", "nineteen forty-five"]
+            },
+            {
+                question: "Who painted the Mona Lisa?",
+                answer: "leonardo da vinci",
+                acceptableAnswers: ["leonardo da vinci", "da vinci", "leonardo"]
+            }
         ];
         
         // DOM elements
@@ -215,17 +275,35 @@
                     ready: false
                 },
                 currentQuestion: 0,
-                gameState: 'waiting' // waiting, playing, showingResults
+                gameState: 'waiting',
+                createdAt: firebase.database.ServerValue.TIMESTAMP
             });
+            
+            // Clean up old games
+            cleanupOldGames();
             
             // Listen for changes
             gameRef.on('value', (snapshot) => {
                 const game = snapshot.val();
+                if (!game) return;
+                
                 updateWaitingRoom(game);
                 
                 if (game.player2.id && game.gameState === 'playing') {
                     startGame(game);
                 }
+            });
+        }
+        
+        // Clean up games older than 12 hours
+        function cleanupOldGames() {
+            const cutoff = Date.now() - 12 * 60 * 60 * 1000;
+            database.ref('games').orderByChild('createdAt').endAt(cutoff).once('value', (snapshot) => {
+                const updates = {};
+                snapshot.forEach((child) => {
+                    updates[child.key] = null;
+                });
+                database.ref('games').update(updates);
             });
         }
         
@@ -237,12 +315,12 @@
                 const game = snapshot.val();
                 
                 if (!game) {
-                    alert('Game not found');
+                    alert('Game not found. Please check the Game ID');
                     return;
                 }
                 
                 if (game.player2.id) {
-                    alert('Game is full');
+                    alert('This game already has 2 players');
                     return;
                 }
                 
@@ -261,6 +339,8 @@
                 
                 gameSetup.style.display = 'none';
                 startGame(game);
+            }).catch((error) => {
+                alert('Error joining game: ' + error.message);
             });
         }
         
@@ -290,10 +370,18 @@
             document.getElementById('player1-name').textContent = game.player1.name;
             document.getElementById('player2-name').textContent = game.player2.name || 'Waiting...';
             
+            // Focus on answer input
+            answerInput.focus();
+            
             // Listen for game changes
             const gameRef = database.ref('games/' + gameId);
             gameRef.on('value', (snapshot) => {
                 const updatedGame = snapshot.val();
+                if (!updatedGame) {
+                    // Game was deleted
+                    endGame();
+                    return;
+                }
                 handleGameUpdate(updatedGame);
             });
             
@@ -331,6 +419,7 @@
             answerInput.value = '';
             answersDiv.style.display = 'none';
             document.getElementById('question-display').style.display = 'block';
+            submitBtn.disabled = false;
             
             // Start timer
             timeLeft = 30;
@@ -350,43 +439,61 @@
         
         // Submit answer
         submitBtn.addEventListener('click', submitAnswer);
+        answerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                submitAnswer();
+            }
+        });
         
         function submitAnswer() {
             clearInterval(timer);
+            submitBtn.disabled = true;
             
             const answer = answerInput.value.trim();
+            if (!answer) {
+                alert('Please enter an answer');
+                submitBtn.disabled = false;
+                return;
+            }
+            
             const playerKey = `player${playerNumber}`;
             const updates = {};
             updates[`${playerKey}/answer`] = answer;
             
-            database.ref('games/' + gameId).update(updates);
-            
-            // Check if both players have answered
-            database.ref('games/' + gameId).once('value').then((snapshot) => {
-                const game = snapshot.val();
-                
-                if ((game.player1.answer && game.player2.answer) || 
-                    (timeLeft <= 0 && (game.player1.answer || game.player2.answer))) {
-                    evaluateAnswers(game);
-                }
-            });
+            database.ref('games/' + gameId).update(updates)
+                .then(() => {
+                    // Check if both players have answered
+                    database.ref('games/' + gameId).once('value').then((snapshot) => {
+                        const game = snapshot.val();
+                        
+                        if ((game.player1.answer && game.player2.answer) || 
+                            (timeLeft <= 0 && (game.player1.answer || game.player2.answer))) {
+                            evaluateAnswers(game);
+                        }
+                    });
+                })
+                .catch((error) => {
+                    alert('Error submitting answer: ' + error.message);
+                    submitBtn.disabled = false;
+                });
             
             document.getElementById('question-display').style.display = 'none';
         }
         
         // Evaluate answers
         function evaluateAnswers(game) {
-            const correctAns = questions[currentQuestionIndex].answer.toLowerCase();
+            const currentQuestion = questions[currentQuestionIndex];
+            const correctAns = currentQuestion.answer;
             const updates = {};
             
             // Check player1's answer
             const player1Ans = game.player1.answer.toLowerCase();
-            const player1Correct = player1Ans === correctAns;
+            const player1Correct = currentQuestion.acceptableAnswers.includes(player1Ans);
             updates['player1/score'] = game.player1.score + (player1Correct ? 1 : 0);
             
             // Check player2's answer
             const player2Ans = game.player2.answer.toLowerCase();
-            const player2Correct = player2Ans === correctAns;
+            const player2Correct = currentQuestion.acceptableAnswers.includes(player2Ans);
             updates['player2/score'] = game.player2.score + (player2Correct ? 1 : 0);
             
             updates['gameState'] = 'showingResults';
@@ -398,23 +505,27 @@
         function showAnswers(game) {
             answersDiv.style.display = 'block';
             
-            const correctAns = questions[currentQuestionIndex].answer;
+            const currentQuestion = questions[currentQuestionIndex];
+            const correctAns = currentQuestion.answer;
             correctAnswer.textContent = correctAns;
             
             // Your answer
             const yourAns = game[`player${playerNumber}`].answer;
-            const yourCorrect = yourAns.toLowerCase() === correctAns.toLowerCase();
+            const yourCorrect = currentQuestion.acceptableAnswers.includes(yourAns.toLowerCase());
             yourAnswer.textContent = yourAns || "(No answer)";
-            yourResult.textContent = yourCorrect ? "Correct!" : "Incorrect";
+            yourResult.textContent = yourCorrect ? "Correct! +1 point" : "Incorrect";
             yourResult.className = yourCorrect ? "correct" : "incorrect";
             
             // Opponent's answer
             const opponentNum = playerNumber === 1 ? 2 : 1;
             const opponentAns = game[`player${opponentNum}`].answer;
-            const opponentCorrect = opponentAns.toLowerCase() === correctAns.toLowerCase();
+            const opponentCorrect = currentQuestion.acceptableAnswers.includes(opponentAns.toLowerCase());
             opponentAnswer.textContent = opponentAns || "(No answer)";
-            opponentResult.textContent = opponentCorrect ? "Correct!" : "Incorrect";
+            opponentResult.textContent = opponentCorrect ? "Correct! +1 point" : "Incorrect";
             opponentResult.className = opponentCorrect ? "correct" : "incorrect";
+            
+            // Focus on next question button
+            nextQuestionBtn.focus();
         }
         
         // Next question
@@ -431,16 +542,37 @@
         
         // End game
         function endGame() {
+            const player1Name = document.getElementById('player1-name').textContent;
+            const player1Score = document.getElementById('player1-score').textContent;
+                        const player2Name = document.getElementById('player2-name').textContent;
+            const player2Score = document.getElementById('player2-score').textContent;
+            
+            let winnerText = "";
+            if (parseInt(player1Score) > parseInt(player2Score)) {
+                winnerText = `${player1Name} wins!`;
+            } else if (parseInt(player2Score) > parseInt(player1Score)) {
+                winnerText = `${player2Name} wins!`;
+            } else {
+                winnerText = "It's a tie!";
+            }
+            
             gameArea.innerHTML = `
                 <h2>Game Over!</h2>
-                <p>Final Scores:</p>
-                <p>${document.getElementById('player1-name').textContent}: ${document.getElementById('player1-score').textContent}</p>
-                <p>${document.getElementById('player2-name').textContent}: ${document.getElementById('player2-score').textContent}</p>
-                <button onclick="location.reload()">Play Again</button>
+                <p>${winnerText}</p>
+                <div class="scoreboard">
+                    <div>${player1Name}: <span class="score">${player1Score}</span></div>
+                    <div>${player2Name}: <span class="score">${player2Score}</span></div>
+                </div>
+                <button onclick="location.reload()" style="margin-top: 20px;">Play Again</button>
             `;
             
             // Clean up Firebase reference
             database.ref('games/' + gameId).off();
+            
+            // Delete the game from Firebase after 10 seconds
+            setTimeout(() => {
+                database.ref('games/' + gameId).remove();
+            }, 10000);
         }
     </script>
 </body>
